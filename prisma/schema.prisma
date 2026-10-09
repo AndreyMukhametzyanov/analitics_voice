@@ -1,0 +1,16 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model GlossaryItem {
+  id          Int      @id @default(autoincrement())
+  keyword     String   @unique
+  aliases     String   @db.Text
+  description String?
+  createdAt   DateTime @default(now())
+}
