@@ -151,6 +151,51 @@ sudo nginx -t && sudo systemctl reload nginx
 
 После перезагрузки сервера снова `npm run server:up`. Повторный `server:setup` не нужен. Остановить приложение: `npm run server:down`.
 
+### Обновление с v1 (сайт уже работает)
+
+Из каталога проекта на сервере:
+
+```bash
+git pull
+npm install
+npm run build
+npm run db:seed    # если в репозитории меняли prisma/glossary/
+npm run server:down
+npm run server:up
+```
+
+Схема БД не менялась — `db:push` обычно не нужен. Whisper заново собирать не нужно.
+
+### Режим ИИ (Ollama)
+
+Без Ollama работает только цепочка Whisper → глоссарий. Тумблер «ИИ» ходит на `127.0.0.1:11434`.
+
+**Один раз на сервере** (нужен sudo, ~1 ГБ под `qwen2.5:1.5b`, лучше 8+ ГБ RAM на whisper + LLM):
+
+```bash
+npm run ollama:setup
+```
+
+Скрипт ставит Ollama, включает сервис, скачивает модель из `OLLAMA_MODEL` в `.env` (по умолчанию `qwen2.5:1.5b`).
+
+В `.env` должны быть строки (скрипт допишет, если их нет):
+
+```env
+OLLAMA_URL="http://127.0.0.1:11434/api/generate"
+OLLAMA_MODEL="qwen2.5:1.5b"
+```
+
+Проверка:
+
+```bash
+curl -s http://127.0.0.1:11434/api/tags | head
+npm run server:up
+```
+
+Порт **11434** наружу не открывай — только localhost, как 3000 и 8080.
+
+`npm run server:down` не останавливает системный `ollama.service` (чтобы LLM не падала между перезапусками Next). Останавливается только процесс, если Ollama поднимали через `ollama serve` вручную.
+
 ## Глоссарий
 
 Таблица `GlossaryItem`. Стартовые строки лежат в `prisma/glossary/` (`voice.ts` — знаки и типы, `abbreviations.ts` — СПГЗ и т.п., `tables-*.ts` — имена таблиц), собираются в `npm run db:seed`. Числа словами обрабатывает код в `lib/voice/spoken-numbers.ts`, в базу их не заносят.

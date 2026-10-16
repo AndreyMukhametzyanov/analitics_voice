@@ -18,6 +18,19 @@ else
   echo "Распознавание запущено, лог: logs/whisper.log"
 fi
 
+if listening 11434; then
+  echo "Ollama уже слушает 127.0.0.1:11434"
+elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^ollama.service'; then
+  sudo systemctl start ollama
+  echo "Запущен ollama.service (127.0.0.1:11434)"
+elif command -v ollama >/dev/null 2>&1; then
+  nohup ollama serve > logs/ollama.log 2>&1 &
+  echo $! > logs/ollama.pid
+  echo "Ollama serve в фоне, лог: logs/ollama.log"
+else
+  echo "Ollama не установлена — режим ИИ не работает. Один раз: npm run ollama:setup" >&2
+fi
+
 if listening 3000; then
   echo "Страница уже слушает 127.0.0.1:3000"
 else

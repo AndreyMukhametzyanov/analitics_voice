@@ -63,6 +63,26 @@ body {
   }
 }
 
+@keyframes ai-frame-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(129, 140, 255, 0.38),
+      0 30px 80px -40px rgba(99, 102, 241, 0.55),
+      0 0 36px -8px rgba(99, 102, 241, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(196, 181, 253, 0.62),
+      0 30px 80px -36px rgba(139, 92, 246, 0.7),
+      0 0 48px -6px rgba(129, 140, 255, 0.72);
+  }
+}
+
+.ai-frame {
+  animation: ai-frame-glow 2.8s ease-in-out infinite;
+}
+
 @keyframes cat-blink {
   0%,
   88%,

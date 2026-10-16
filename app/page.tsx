@@ -1,11 +1,14 @@
 "use client";
 
-import { Code2, Copy, CornerDownLeft, ImageIcon, Link2, Mic, MicOff, MousePointer2, Play, Square, Trash2 } from "lucide-react";
+import { Code2, Copy, CornerDownLeft, ImageIcon, Link2, Mic, MicOff, MousePointer2, Play, Sparkles, Square, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { insertRecognizedText } from "@/lib/voice/insert";
 import { CatCompanion } from "./cat-companion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 type ProcessVoiceResponse = {
   text?: string;
+  replaceAll?: boolean;
   error?: string;
 };
 
@@ -14,6 +17,9 @@ const DEMO_SPOKEN =
 const DEMO_RESULT =
   "Я формулирую: В таблицу `purchases_specs` добавить два поля, одно `boolean`, а другое `int`.\n{{ВСТАВИТЬ_СКРИНШОТ}}";
 const DRAFT_STORAGE_KEY = "tz-iz-vozduha-draft";
+const AI_MODE_STORAGE_KEY = "tz-iz-vozduha-ai-mode";
+const AI_MODE_TOOLTIP =
+  "Включено: после распознавания и глоссария локальная LLM заново перечитывает всё поле целиком и сразу оформляет его — абзацы, пункты, отступы. Общий смысл всего текста сохраняется. Выключено: вставляется только новый фрагмент в место курсора.";
 
 const VOICE_SIGN_HINTS = [
   { say: "запятая", gets: "," },
@@ -28,24 +34,6 @@ const VOICE_SIGN_HINTS = [
   { say: "больше или равно", gets: ">=" },
   { say: "меньше или равно", gets: "<=" },
 ] as const;
-
-function insertRecognizedText(
-  currentText: string,
-  cursorPosition: number,
-  recognizedText: string,
-): { text: string; cursor: number } {
-  const safePosition = Math.min(Math.max(cursorPosition, 0), currentText.length);
-  const before = currentText.substring(0, safePosition);
-  const after = currentText.substring(safePosition);
-  const sticksToPrevious = /^[\n,.;:!?]/.test(recognizedText);
-  const sticksToNext = /[\n]$/.test(recognizedText) || /^[\n,.;:!?]/.test(after);
-  const leadingSpace = before.length > 0 && !/[\s]$/.test(before) && !sticksToPrevious ? " " : "";
-  const trailingSpace = after.length > 0 && !/^[\s]/.test(after) && !sticksToNext ? " " : "";
-  const text = `${before}${leadingSpace}${recognizedText}${trailingSpace}${after}`;
-  const cursor = before.length + leadingSpace.length + recognizedText.length + trailingSpace.length;
-
-  return { text, cursor };
-}
 
 function Soundwave(): ReactNode {
   return (
@@ -73,8 +61,10 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [aiMode, setAiMode] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const aiModeRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const cursorPositionRef = useRef<number>(0);
@@ -98,6 +88,7 @@ export default function Home() {
     if (saved) {
       setText(saved);
     }
+    setAiMode(window.localStorage.getItem(AI_MODE_STORAGE_KEY) === "1");
     setDraftReady(true);
 
     return () => {
@@ -106,6 +97,17 @@ export default function Home() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    aiModeRef.current = aiMode;
+  }, [aiMode]);
+
+  useEffect(() => {
+    if (!draftReady) {
+      return;
+    }
+    window.localStorage.setItem(AI_MODE_STORAGE_KEY, aiMode ? "1" : "0");
+  }, [aiMode, draftReady]);
 
   useEffect(() => {
     if (!draftReady || isDemo) {
@@ -172,6 +174,9 @@ export default function Home() {
     setIsLoading(true);
     const formData = new FormData();
     formData.append("audio", audioBlob);
+    formData.append("aiMode", aiModeRef.current ? "1" : "0");
+    formData.append("documentText", textareaRef.current?.value ?? "");
+    formData.append("cursorPosition", String(cursorPositionRef.current));
 
     try {
       const response = await fetch("/api/process-voice", {
@@ -181,21 +186,34 @@ export default function Home() {
       const data = (await response.json()) as ProcessVoiceResponse;
 
       if (data.text) {
-        const position = cursorPositionRef.current;
-        const recognizedText = data.text;
-        setText((currentText) => {
-          const inserted = insertRecognizedText(currentText, position, recognizedText);
-          cursorPositionRef.current = inserted.cursor;
+        if (data.replaceAll) {
+          setText(data.text);
+          cursorPositionRef.current = data.text.length;
           window.requestAnimationFrame(() => {
             const field = textareaRef.current;
             if (!field) {
               return;
             }
             field.focus();
-            field.setSelectionRange(inserted.cursor, inserted.cursor);
+            field.setSelectionRange(data.text!.length, data.text!.length);
           });
-          return inserted.text;
-        });
+        } else {
+          const position = cursorPositionRef.current;
+          const recognizedText = data.text;
+          setText((currentText) => {
+            const inserted = insertRecognizedText(currentText, position, recognizedText);
+            cursorPositionRef.current = inserted.cursor;
+            window.requestAnimationFrame(() => {
+              const field = textareaRef.current;
+              if (!field) {
+                return;
+              }
+              field.focus();
+              field.setSelectionRange(inserted.cursor, inserted.cursor);
+            });
+            return inserted.text;
+          });
+        }
       } else if (data.error) {
         window.alert(`Ошибка ИИ: ${data.error}`);
       }
@@ -283,7 +301,42 @@ export default function Home() {
           </p>
         </header>
 
-        <section className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-3 shadow-[0_30px_80px_-40px_rgba(99,102,241,0.45)] backdrop-blur-md">
+        <section
+          className={`rounded-2xl border bg-zinc-900/40 p-3 backdrop-blur-md transition-[border-color,box-shadow] duration-500 ${
+            aiMode
+              ? "ai-frame border-indigo-400/50"
+              : "border-zinc-800/80 shadow-[0_30px_80px_-40px_rgba(99,102,241,0.45)]"
+          }`}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+              {aiMode ? "Whisper → глоссарий → LLM" : "Whisper → глоссарий"}
+            </p>
+            <label
+              className={`group relative inline-flex shrink-0 cursor-pointer items-center gap-2.5 rounded-full border py-1.5 pl-2.5 pr-2 text-xs font-medium leading-none transition has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40 ${
+                aiMode
+                  ? "border-indigo-400/40 bg-indigo-500/15 text-indigo-100 shadow-[0_0_18px_-6px_rgba(129,140,255,0.9)]"
+                  : "border-white/10 bg-black/20 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+              }`}
+            >
+              <span
+                id="ai-mode-tooltip"
+                role="tooltip"
+                className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] right-0 z-20 hidden w-72 rounded-xl border border-zinc-700/90 bg-[#121218] px-3 py-2.5 text-left text-[11px] font-normal normal-case leading-5 tracking-normal text-zinc-300 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.85)] group-hover:block group-focus-within:block"
+              >
+                {AI_MODE_TOOLTIP}
+              </span>
+              <Sparkles className={`h-3.5 w-3.5 shrink-0 ${aiMode ? "text-indigo-300" : "text-zinc-500"}`} />
+              <span className="shrink-0">ИИ</span>
+              <Switch
+                checked={aiMode}
+                onCheckedChange={setAiMode}
+                disabled={isLoading || isRecording || isDemo}
+                aria-label="Режим ИИ"
+                aria-describedby="ai-mode-tooltip"
+              />
+            </label>
+          </div>
           <div className="relative h-72">
             <textarea
               ref={textareaRef}
@@ -294,11 +347,17 @@ export default function Home() {
               onChange={(event) => {
                 setText(event.target.value);
               }}
-              className="h-full w-full resize-none rounded-xl border border-transparent bg-black/30 px-4 py-4 font-mono text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-600 disabled:opacity-70"
+              className={`h-full w-full resize-none rounded-xl border px-4 py-4 font-mono text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-600 disabled:opacity-70 ${
+                aiMode
+                  ? "border-indigo-400/25 bg-indigo-950/25 shadow-[inset_0_0_48px_-18px_rgba(99,102,241,0.55)]"
+                  : "border-transparent bg-black/30"
+              }`}
             />
             {isLoading ? (
               <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 backdrop-blur-sm">
-                <p className="text-sm text-zinc-300">Разбираю запись...</p>
+                <p className="text-sm text-zinc-300">
+                  {aiMode ? "ИИ оформляет весь текст..." : "Разбираю запись..."}
+                </p>
               </div>
             ) : null}
           </div>

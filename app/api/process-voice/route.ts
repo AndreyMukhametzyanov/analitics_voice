@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { MAX_AUDIO_BYTES, audioExtension, hasSpeech, transcodeToWav } from '@/lib/audio';
-import { getGlossary, polishTranscript } from '@/lib/voice';
+import {
+  formatDocumentWithLlm,
+  getGlossary,
+  insertRecognizedText,
+  polishTranscript,
+} from '@/lib/voice';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const WHISPER_URL = process.env.WHISPER_URL ?? 'http://127.0.0.1:8080/inference';
 
@@ -20,6 +25,9 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const audioBlob = formData.get('audio');
+    const aiMode = formData.get('aiMode') === '1' || formData.get('aiMode') === 'true';
+    const documentText = String(formData.get('documentText') ?? '');
+    const cursorPosition = Number(formData.get('cursorPosition') ?? 0);
 
     if (!(audioBlob instanceof Blob)) {
       return NextResponse.json({ error: 'Аудиофайл не найден' }, { status: 400 });
@@ -41,8 +49,6 @@ export async function POST(request: Request) {
     if (!hasSpeech(wav)) {
       return NextResponse.json({ text: '' });
     }
-
-    const glossary = await getGlossary();
 
     const whisperForm = new FormData();
     whisperForm.append('file', new Blob([new Uint8Array(wav)], { type: 'audio/wav' }), 'audio.wav');
@@ -68,12 +74,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ text: '' });
     }
 
-    const text = polishTranscript(rawText, glossary);
-    if (!text) {
+    const glossary = await getGlossary();
+    const fragment = polishTranscript(rawText, glossary);
+    if (!fragment) {
       return NextResponse.json({ text: '' });
     }
 
-    return NextResponse.json({ text });
+    if (!aiMode) {
+      return NextResponse.json({ text: fragment });
+    }
+
+    const merged = insertRecognizedText(
+      documentText,
+      Number.isFinite(cursorPosition) ? cursorPosition : 0,
+      fragment,
+    );
+    const formatted = await formatDocumentWithLlm(merged.text);
+
+    return NextResponse.json({ text: formatted, replaceAll: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return NextResponse.json({ error: message }, { status: 500 });

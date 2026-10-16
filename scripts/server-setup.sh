@@ -32,6 +32,8 @@ if [[ ! -f .env ]]; then
   cat > .env <<EOF
 DATABASE_URL="mysql://air_user:${password}@localhost:3306/tz_iz_vozduha_db"
 WHISPER_URL="http://127.0.0.1:8080/inference"
+OLLAMA_URL="http://127.0.0.1:11434/api/generate"
+OLLAMA_MODEL="qwen2.5:1.5b"
 EOF
   chmod 600 .env
 fi
