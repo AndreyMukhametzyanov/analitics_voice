@@ -17,7 +17,7 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-MODEL="${OLLAMA_MODEL:-qwen2.5:1.5b}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
 
 if ! command -v ollama >/dev/null 2>&1; then
   echo "Ставлю Ollama (нужен sudo)..."

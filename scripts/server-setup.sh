@@ -64,5 +64,5 @@ npm run build
 
 echo
 echo "Сборка готова. Дальше на сервере: npm run server:up"
-echo "Nginx должен проксировать https://<домен> на http://127.0.0.1:3000"
+echo "Nginx должен проксировать https://<домен> на http://127.0.0.1:5090"
 echo "Пример конфига: deploy/nginx.conf.example"

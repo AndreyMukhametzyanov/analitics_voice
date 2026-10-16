@@ -1,28 +1,41 @@
 #!/usr/bin/env bash
-# Поднимает whisper и страницу в фоне. Оба слушают только 127.0.0.1.
+# Поднимает whisper, ollama и страницу в фоне. Слушают только 127.0.0.1.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 mkdir -p logs
 
+WHISPER_PORT=8080
+OLLAMA_PORT=11434
+NEXT_PORT=5090
+
 listening() {
   ss -ltn | grep -q ":$1 "
 }
 
-if listening 8080; then
-  echo "Распознавание уже слушает 127.0.0.1:8080"
+running_pid() {
+  local file="$1"
+  [[ -f "$file" ]] && kill -0 "$(cat "$file")" 2>/dev/null
+}
+
+# --- Whisper ---
+if running_pid logs/whisper.pid; then
+  echo "Распознавание уже запущено (pid $(cat logs/whisper.pid))"
+elif listening "$WHISPER_PORT"; then
+  echo "Порт $WHISPER_PORT уже слушает кто-то (возможно, whisper) — пропускаю"
 else
   nohup bash scripts/start-whisper.sh > logs/whisper.log 2>&1 &
   echo $! > logs/whisper.pid
   echo "Распознавание запущено, лог: logs/whisper.log"
 fi
 
-if listening 11434; then
-  echo "Ollama уже слушает 127.0.0.1:11434"
+# --- Ollama ---
+if listening "$OLLAMA_PORT"; then
+  echo "Ollama уже слушает 127.0.0.1:$OLLAMA_PORT"
 elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^ollama.service'; then
   sudo systemctl start ollama
-  echo "Запущен ollama.service (127.0.0.1:11434)"
+  echo "Запущен ollama.service (127.0.0.1:$OLLAMA_PORT)"
 elif command -v ollama >/dev/null 2>&1; then
   nohup ollama serve > logs/ollama.log 2>&1 &
   echo $! > logs/ollama.pid
@@ -31,18 +44,24 @@ else
   echo "Ollama не установлена — режим ИИ не работает. Один раз: npm run ollama:setup" >&2
 fi
 
-if listening 3000; then
-  echo "Страница уже слушает 127.0.0.1:3000"
+# --- Next.js ---
+if running_pid logs/next.pid; then
+  echo "Страница уже запущена (pid $(cat logs/next.pid))"
 else
   if [[ ! -d .next ]]; then
     echo "Нет сборки. Сначала: npm run server:setup" >&2
     exit 1
   fi
-  nohup ./node_modules/.bin/next start -H 127.0.0.1 -p 3000 > logs/next.log 2>&1 &
+  if listening "$NEXT_PORT"; then
+    echo "Порт $NEXT_PORT занят чужим процессом:" >&2
+    ss -ltnp | grep ":$NEXT_PORT " >&2
+    echo "Освободи порт или поменяй NEXT_PORT в этом скрипте и в Nginx." >&2
+    exit 1
+  fi
+  nohup ./node_modules/.bin/next start -H 127.0.0.1 -p "$NEXT_PORT" > logs/next.log 2>&1 &
   echo $! > logs/next.pid
-  echo "Страница запущена, лог: logs/next.log"
+  echo "Страница запущена на 127.0.0.1:$NEXT_PORT, лог: logs/next.log"
 fi
 
-echo "Страница доступна Nginx на http://127.0.0.1:3000"
-echo "Аналитики открывают https://<домен>"
+echo "Nginx должен проксировать https://<домен> на http://127.0.0.1:$NEXT_PORT"
 echo "Остановить: npm run server:down"
