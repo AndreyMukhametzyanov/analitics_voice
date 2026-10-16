@@ -15,6 +15,20 @@ const DEMO_RESULT =
   "Я формулирую: В таблицу `purchases_specs` добавить два поля, одно `boolean`, а другое `int`.\n{{ВСТАВИТЬ_СКРИНШОТ}}";
 const DRAFT_STORAGE_KEY = "tz-iz-vozduha-draft";
 
+const VOICE_SIGN_HINTS = [
+  { say: "запятая", gets: "," },
+  { say: "точка", gets: "." },
+  { say: "новая строка", gets: "↵" },
+  { say: "двоеточие", gets: ":" },
+  { say: "двойная кавычка", gets: '"' },
+  { say: "тире", gets: "-" },
+  { say: "равно", gets: "=" },
+  { say: "больше", gets: ">" },
+  { say: "меньше", gets: "<" },
+  { say: "больше или равно", gets: ">=" },
+  { say: "меньше или равно", gets: "<=" },
+] as const;
+
 function insertRecognizedText(
   currentText: string,
   cursorPosition: number,
@@ -393,18 +407,23 @@ export default function Home() {
           <article className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-700 md:col-span-2">
             <CornerDownLeft className="h-4 w-4 text-zinc-300" />
             <h2 className="mt-4 text-sm font-medium text-zinc-100">Знаки</h2>
-            <p className="mt-2 text-sm leading-5 text-zinc-500">Скажи слово, в текст попадёт знак.</p>
+            <p className="mt-2 text-sm leading-5 text-zinc-500">
+              Назови команду — вставится символ. Числа словами превращаются в цифры: «пункт один» → Пункт 1, «пять» → 5.
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-zinc-300">
-                запятая → ,
-              </span>
-              <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-zinc-300">
-                точка → .
-              </span>
-              <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-zinc-300">
-                новая строка → ↵
-              </span>
+              {VOICE_SIGN_HINTS.map((hint) => (
+                <span
+                  key={hint.say}
+                  className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-zinc-300"
+                  title={`Скажи «${hint.say}»`}
+                >
+                  {hint.say} → {hint.gets}
+                </span>
+              ))}
             </div>
+            <p className="mt-3 text-xs leading-5 text-zinc-600">
+              Кавычку надёжнее «двойная кавычка», не «кавычка».
+            </p>
           </article>
 
           <article className="rounded-2xl border border-zinc-800/60 bg-zinc-950/70 p-4 text-zinc-500 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-700 md:col-span-2">
