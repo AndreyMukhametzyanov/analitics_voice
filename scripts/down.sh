@@ -20,4 +20,3 @@ stop_pid() {
 
 stop_pid logs/next.pid "страница"
 stop_pid logs/whisper.pid "распознавание"
-stop_pid logs/ollama.pid "ollama (локальный serve)"

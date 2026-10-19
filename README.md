@@ -166,35 +166,24 @@ npm run server:up
 
 Схема БД не менялась — `db:push` обычно не нужен. Whisper заново собирать не нужно.
 
-### Режим ИИ (Ollama)
+### Режим ИИ (удалённый API)
 
-Без Ollama работает только цепочка Whisper → глоссарий. Тумблер «ИИ» ходит на `127.0.0.1:11434`.
+Без настроенного API работает только цепочка Whisper → глоссарий. Тумблер «ИИ» шлёт черновик на внешний сервер с OpenAI-совместимым `POST …/v1/chat/completions`.
 
-**Один раз на сервере** (нужен sudo, ~1 ГБ под `qwen2.5:1.5b`, лучше 8+ ГБ RAM на whisper + LLM):
+Все параметры ИИ — только в `.env` (образец в `.env.example`):
 
-```bash
-npm run ollama:setup
-```
+| Переменная | Назначение |
+| --- | --- |
+| `LLM_BASE_URL` | корень API, например `https://my-test/api` |
+| `LLM_API_KEY` | ключ (`sk-…`), заголовок `Authorization: Bearer` |
+| `LLM_MODEL` | id модели на сервере |
+| `LLM_DOCUMENT_MAX_CHARS` | лимит длины черновика (по умолчанию 12000) |
+| `LLM_REQUEST_TIMEOUT_MS` | таймаут запроса (по умолчанию 120000) |
+| `LLM_TEMPERATURE` | температура (по умолчанию 0.12) |
 
-Скрипт ставит Ollama, включает сервис, скачивает модель из `OLLAMA_MODEL` в `.env` (по умолчанию `qwen2.5:1.5b`).
+`LLM_BASE_URL` — без `/v1/chat/completions` (путь допишется сам). Если у провайдера другой URL, укажи полный путь до `chat/completions`.
 
-В `.env` должны быть строки (скрипт допишет, если их нет):
-
-```env
-OLLAMA_URL="http://127.0.0.1:11434/api/generate"
-OLLAMA_MODEL="qwen2.5:1.5b"
-```
-
-Проверка:
-
-```bash
-curl -s http://127.0.0.1:11434/api/tags | head
-npm run server:up
-```
-
-Порт **11434** наружу не открывай — только localhost, как 3000 и 8080.
-
-`npm run server:down` не останавливает системный `ollama.service` (чтобы LLM не падала между перезапусками Next). Останавливается только процесс, если Ollama поднимали через `ollama serve` вручную.
+После смены `.env` перезапусти Next.js (`npm run server:up` или dev-сервер).
 
 ## Глоссарий
 

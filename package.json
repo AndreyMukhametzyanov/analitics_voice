@@ -15,7 +15,6 @@
     "server:setup": "bash scripts/server-setup.sh",
     "server:up": "bash scripts/up.sh",
     "server:down": "bash scripts/down.sh",
-    "ollama:setup": "bash scripts/setup-ollama.sh",
     "postinstall": "prisma generate"
   },
   "prisma": {

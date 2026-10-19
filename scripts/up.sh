@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Поднимает whisper, ollama и страницу в фоне. Слушают только 127.0.0.1.
+# Поднимает whisper и страницу в фоне. Слушают только 127.0.0.1. ИИ — из .env (LLM_*).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,7 +7,6 @@ cd "$ROOT"
 mkdir -p logs
 
 WHISPER_PORT=8080
-OLLAMA_PORT=11434
 NEXT_PORT=5090
 
 listening() {
@@ -28,20 +27,6 @@ else
   nohup bash scripts/start-whisper.sh > logs/whisper.log 2>&1 &
   echo $! > logs/whisper.pid
   echo "Распознавание запущено, лог: logs/whisper.log"
-fi
-
-# --- Ollama ---
-if listening "$OLLAMA_PORT"; then
-  echo "Ollama уже слушает 127.0.0.1:$OLLAMA_PORT"
-elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^ollama.service'; then
-  sudo systemctl start ollama
-  echo "Запущен ollama.service (127.0.0.1:$OLLAMA_PORT)"
-elif command -v ollama >/dev/null 2>&1; then
-  nohup ollama serve > logs/ollama.log 2>&1 &
-  echo $! > logs/ollama.pid
-  echo "Ollama serve в фоне, лог: logs/ollama.log"
-else
-  echo "Ollama не установлена — режим ИИ не работает. Один раз: npm run ollama:setup" >&2
 fi
 
 # --- Next.js ---
