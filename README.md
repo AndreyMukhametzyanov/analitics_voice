@@ -108,7 +108,41 @@ npm run dev
 
 `WHISPER_URL` в `.env` можно не менять. По умолчанию приложение ходит на `http://127.0.0.1:8080/inference`.
 
-## На сервере
+## Docker на сервере
+
+На хосте нужны Docker (с Compose), git и интернет. Node.js, ffmpeg и whisper.cpp **не ставят** — всё собирается внутри контейнеров.
+
+Два образа, два контейнера. `app` — наше приложение (собирается из Dockerfile). `whisper` — готовый `ghcr.io/ggml-org/whisper.cpp:main`, его не собираем, Docker скачивает сам. Связка: `http://whisper:8080/inference`. MariaDB в compose нет.
+
+```bash
+git clone <адрес-репозитория>
+cd voice_analyzer
+cp .env.example .env
+```
+
+В `.env` укажи `DATABASE_URL` к уже работающей MariaDB:
+
+- база в Docker в той же сети — хост = имя контейнера;
+- порт 3306 на хосте — `host.docker.internal` (в compose уже есть `extra_hosts`).
+
+Пользователь MySQL должен пускать не только `localhost`. Пустая схема — один раз добавь `RUN_DB_SETUP=1`, после старта убери и перезапусти. Если таблицы уже есть, флаг не ставь.
+
+```bash
+docker compose up -d --build
+```
+
+`--build` собирает **только наше** приложение. Образ Whisper Docker берёт с `ghcr.io`. При первом старте контейнер Whisper докачает файл модели (~1.5 ГБ). Нужно 2–4 ГБ RAM. Страница: `http://127.0.0.1:5090`. Снаружи — Nginx на этот порт, HTTPS обязателен (`deploy/nginx.conf.example`). Порт Whisper наружу не открывай.
+
+Обновление (Whisper заново качать не надо):
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Если в репе меняли `prisma/glossary/` и таблицы уже есть: `docker compose exec app node prisma/seed.cjs`.
+
+## На сервере без Docker
 
 Зайди на сервер и склонируй репозиторий. Дальше команды из каталога проекта, от обычного пользователя. `sudo` скрипт спросит сам.
 
