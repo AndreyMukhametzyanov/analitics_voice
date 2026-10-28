@@ -1,9 +1,13 @@
+# Образ whisper.cpp: ENTRYPOINT ["bash", "-c"] — command должен быть ОДНОЙ строкой.
+# Иначе запускается голый whisper-server: модель base.en и bind 127.0.0.1
+# (приложение из соседнего контейнера до него не достучится).
+
 services:
   app:
     image: voice_analyzer:latest
     build: .
     ports:
-      - "0.0.0.0:5090:3000"
+      - "127.0.0.1:5090:3000"
     env_file:
       - .env
     extra_hosts:
@@ -13,29 +17,33 @@ services:
       WHISPER_URL: http://whisper:8080/inference
     depends_on:
       whisper:
-        condition: service_started # Запускаем приложение сразу, как только контейнер whisper стартует
+        condition: service_healthy
 
   whisper:
     image: ghcr.io/ggml-org/whisper.cpp:main
     restart: unless-stopped
-    # Используем прямую команду без вызова 'sh -c'.
-    # Флаг --download-model автоматически скачает medium, если её нет в папке /models
+    # Образ сам ставит ENTRYPOINT bash -c; без своего entrypoint скрипт режется на слова.
+    entrypoint: ["/bin/bash", "-c"]
     command:
-      - whisper-server
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8080"
-      - --language
-      - ru
-      - -t
-      - "8"
-      - --download-model
-      - medium
-      - -m
-      - /models/ggml-medium.bin
+      - |
+        set -e
+        mkdir -p /models
+        if [ ! -f /models/ggml-medium.bin ]; then
+          echo "Скачиваю ggml-medium.bin (~1.5 ГБ)..."
+          curl -fL --retry 3 --retry-all-errors \
+            -o /models/ggml-medium.bin.part \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
+          mv /models/ggml-medium.bin.part /models/ggml-medium.bin
+        fi
+        exec whisper-server --host 0.0.0.0 --port 8080 --language ru -t 8 -m /models/ggml-medium.bin
     volumes:
-      - whisper_models:/models # Добавляем volume, чтобы модель не скачивалась заново при каждом перезапуске
+      - whisper_models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
 
 volumes:
-  whisper_models: # Память на сервере для хранения весов нейросети
+  whisper_models:

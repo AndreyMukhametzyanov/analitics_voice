@@ -28,6 +28,38 @@ const FILLER_PATTERNS = [...FILLERS]
       new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(filler)}(?=$|[^\\p{L}\\p{N}])`, 'giu'),
   );
 
+const WORD_EDGE = String.raw`[^\p{L}\p{N}_]`;
+const LINK_VERB =
+  'вставь(?:те)?|вставте|вставить|ставь|ставить|поставь|поставить|прикрепи(?:ть)?';
+const LINK_NOUN = 'ссылк[аеиуы]|ссилк[аеиуы]|сылк[аеиуы]|ссык[аеиуы]|сык[аеиуы]';
+const PLACE = 'здесь|тут|сюда';
+
+/** «тут будет скриншот» и «тут будет ссылка» — одна и та же конструкция. */
+const INSERT_SHOT_PLACE = new RegExp(
+  `(^|${WORD_EDGE})(?:${PLACE})\\s+(?:будет\\s+)?(?:скриншот(?:а|у|е|ом)?|скрин)(?=$|${WORD_EDGE})`,
+  'giu',
+);
+const INSERT_PICTURE_PLACE = new RegExp(
+  `(^|${WORD_EDGE})(?:${PLACE})\\s+(?:будет\\s+)?картинк[аеиуы](?=$|${WORD_EDGE})`,
+  'giu',
+);
+const INSERT_LINK_COMMAND = new RegExp(
+  `(^|${WORD_EDGE})(?:${LINK_VERB})\\s+(?:${LINK_NOUN})(?=$|${WORD_EDGE})`,
+  'giu',
+);
+const INSERT_LINK_PLACE = new RegExp(
+  `(^|${WORD_EDGE})(?:${PLACE})\\s+(?:будет\\s+)?(?:${LINK_NOUN})(?=$|${WORD_EDGE})`,
+  'giu',
+);
+
+function normalizeInsertLinkCommands(text: string): string {
+  return text
+    .replace(INSERT_SHOT_PLACE, '$1здесь будет скриншот')
+    .replace(INSERT_PICTURE_PLACE, '$1здесь будет картинка')
+    .replace(INSERT_LINK_COMMAND, '$1вставить ссылку')
+    .replace(INSERT_LINK_PLACE, '$1здесь будет ссылка');
+}
+
 function capitalizeInsideQuotes(text: string): string {
   return text
     .replace(/(^|[^\p{L}\p{N}])«(\p{Ll})/gu, (_, before, letter) => `${before}«${letter.toUpperCase()}`)
@@ -77,6 +109,7 @@ export function polishTranscript(rawText: string, glossary: CompiledGlossary): s
   }
 
   text = replaceSpokenNumbers(text);
+  text = normalizeInsertLinkCommands(text);
 
   for (const term of glossary.terms) {
     text = text.replace(term.pattern, `$1${term.replacement}`);

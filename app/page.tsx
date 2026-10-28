@@ -437,7 +437,7 @@ export default function Home() {
                 <ImageIcon className="h-4 w-4 text-indigo-300" />
                 <h2 className="mt-4 text-sm font-medium text-zinc-100">Скриншот и ссылка</h2>
                 <p className="mt-2 text-sm leading-5 text-zinc-500">
-                  Скажи «здесь будет картинка» или «вставить ссылку». В текст попадёт метатег: место, куда потом вставишь скриншот или ссылку.
+                  Скажи «тут будет скриншот» или «тут будет ссылка». В текст попадёт метатег: место, куда потом вставишь скриншот или ссылку.
                 </p>
               </div>
             </div>

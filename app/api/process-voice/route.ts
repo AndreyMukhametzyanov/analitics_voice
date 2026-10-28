@@ -71,6 +71,10 @@ export async function POST(request: Request) {
     whisperForm.append('response_format', 'json');
     whisperForm.append('temperature', '0');
     whisperForm.append('suppress_nst', 'true');
+    whisperForm.append(
+      'prompt',
+      'Техническое задание. Команды: вставить ссылку, вставить скриншот, здесь будет картинка, запятая.',
+    );
 
     let whisperResponse: Response;
     try {
