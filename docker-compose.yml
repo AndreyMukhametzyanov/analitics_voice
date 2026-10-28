@@ -1,18 +1,9 @@
-# На сервере: git clone, cp .env.example .env, поправить DATABASE_URL,
-# затем: docker compose up -d --build
-#
-# Два образа, два контейнера:
-#   app     — наш, собирается из Dockerfile в корне
-#   whisper — готовый ghcr.io/ggml-org/whisper.cpp:main (скачивается, не собираем)
-# Связка: http://whisper:8080/inference
-# Пустая схема: RUN_DB_SETUP=1 в .env, потом убери.
-
 services:
   app:
     image: voice_analyzer:latest
     build: .
     ports:
-      - "127.0.0.1:5090:3000"
+      - "0.0.0.0:5090:3000"
     env_file:
       - .env
     extra_hosts:
@@ -22,23 +13,29 @@ services:
       WHISPER_URL: http://whisper:8080/inference
     depends_on:
       whisper:
-        condition: service_healthy
+        condition: service_started # Запускаем приложение сразу, как только контейнер whisper стартует
 
   whisper:
     image: ghcr.io/ggml-org/whisper.cpp:main
     restart: unless-stopped
+    # Используем прямую команду без вызова 'sh -c'.
+    # Флаг --download-model автоматически скачает medium, если её нет в папке /models
     command:
-      - sh
-      - -c
-      - |
-        mkdir -p /models
-        if [ ! -f /models/ggml-medium.bin ]; then
-          download-ggml-model.sh medium /models
-        fi
-        exec whisper-server --host 0.0.0.0 --port 8080 --language ru -t 8 -m /models/ggml-medium.bin
-    healthcheck:
-      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:8080/"]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
+      - whisper-server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --language
+      - ru
+      - -t
+      - "8"
+      - --download-model
+      - medium
+      - -m
+      - /models/ggml-medium.bin
+    volumes:
+      - whisper_models:/models # Добавляем volume, чтобы модель не скачивалась заново при каждом перезапуске
+
+volumes:
+  whisper_models: # Память на сервере для хранения весов нейросети
