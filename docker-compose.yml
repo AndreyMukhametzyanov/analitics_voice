@@ -7,7 +7,7 @@ services:
     image: voice_analyzer:latest
     build: .
     ports:
-      - "127.0.0.1:5090:3000"
+      - "0.0.0.0:5090:3000"
     env_file:
       - .env
     extra_hosts:
