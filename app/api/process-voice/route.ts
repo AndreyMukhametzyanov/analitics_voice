@@ -10,7 +10,22 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 180;
 
-const WHISPER_URL = process.env.WHISPER_URL ?? 'http://127.0.0.1:8080/inference';
+function whisperUrl(): string {
+  // Читать в рантайме: Next иначе может зашить 127.0.0.1 на этапе build.
+  return process.env['WHISPER_URL'] ?? 'http://127.0.0.1:8080/inference';
+}
+
+function whisperFetchError(error: unknown): Error {
+  if (error instanceof Error && error.name === 'TimeoutError') {
+    return new Error('Whisper не ответил вовремя');
+  }
+  if (error instanceof Error && /fetch|ECONNREFUSED|ENOTFOUND|network/i.test(error.message)) {
+    return new Error(
+      `Whisper недоступен (${whisperUrl()}). Проверь контейнер whisper и WHISPER_URL.`,
+    );
+  }
+  return error instanceof Error ? error : new Error('Whisper вернул ошибку');
+}
 
 export async function POST(request: Request) {
   try {
@@ -57,11 +72,16 @@ export async function POST(request: Request) {
     whisperForm.append('temperature', '0');
     whisperForm.append('suppress_nst', 'true');
 
-    const whisperResponse = await fetch(WHISPER_URL, {
-      method: 'POST',
-      body: whisperForm,
-      signal: AbortSignal.timeout(120_000),
-    });
+    let whisperResponse: Response;
+    try {
+      whisperResponse = await fetch(whisperUrl(), {
+        method: 'POST',
+        body: whisperForm,
+        signal: AbortSignal.timeout(120_000),
+      });
+    } catch (error: unknown) {
+      throw whisperFetchError(error);
+    }
 
     if (!whisperResponse.ok) {
       const detail = await whisperResponse.text();

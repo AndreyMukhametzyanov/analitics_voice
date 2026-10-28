@@ -215,7 +215,7 @@ export default function Home() {
           });
         }
       } else if (data.error) {
-        window.alert(`Ошибка ИИ: ${data.error}`);
+        window.alert(`Ошибка: ${data.error}`);
       }
     } catch {
       window.alert("Не удалось обработать аудио на бэкенде");

@@ -14,6 +14,7 @@ RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="mysql://build:build@127.0.0.1:3306/build"
+ENV WHISPER_URL="http://whisper:8080/inference"
 
 RUN npx prisma generate \
   && npm run build \
